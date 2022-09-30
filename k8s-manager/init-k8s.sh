@@ -16,7 +16,7 @@ cd /home/ubuntu
 cat <<EOF > /home/ubuntu/hosts
 [all:vars]
 ansible_become=true
-ansible_private_ssh_key=/home/ubuntu/windows.pem
+ansible_ssh_private_key_file=/home/ubuntu/windows.pem
 ansible_user=ubuntu
 
 [all]
@@ -118,11 +118,16 @@ sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.containerd'
 sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.kubernetes'
 
 #Edit role file to use k8s with containerd
+##On master node file
 line=("16" "25")
 for n in "${line[@]}";
 do
 sed -i "${n}s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/master-setup.yml
 done
+
+##On worker node file
+sed -i "s/shell/command/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
+sed -i "5s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
 
 #change permission
 chown ubuntu:ubuntu /home/ubuntu/hosts
@@ -133,5 +138,6 @@ sudo -H -u ubuntu bash -c 'ansible-playbook -i /home/ubuntu/hosts /home/ubuntu/p
 
 #Copy config file 
 mkdir -p /home/ubuntu/.kube
-cp /etc/kubernetes/admin.config /home/ubuntu/.kube
-mv /home/ubuntu/.kube/admin.config  /home/ubuntu/.kube/config
+cp /etc/kubernetes/admin.conf /home/ubuntu/.kube
+mv /home/ubuntu/.kube/admin.conf  /home/ubuntu/.kube/config
+sudo chown -R ubuntu:ubuntu /home/ubuntu/.kube
