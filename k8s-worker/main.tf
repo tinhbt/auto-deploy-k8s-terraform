@@ -44,7 +44,8 @@ resource "aws_instance" "worker" {
     id      = "lt-017a1f9eab9eafa42"
     version = "1"
   }
-  # user_data = file("init-docker.sh")
+
+  user_data = file("init-worker.sh")
   tags = {
     "Name" = each.key
   }

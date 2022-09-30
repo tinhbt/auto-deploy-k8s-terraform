@@ -1,16 +1,15 @@
 #!/bin/bash
 sudo apt update -y
 sudo apt install -y ansible
-ip_worker=${worker_ip}
+
 #Change /etc/hosts
 hostname -I | sed "s/$/$(hostname)/" | tee /etc/hosts
-
-host2="$ip_worker $hostname_worker"
+echo "ip_worker worker1" | tee -a /etc/hosts
 
 #Edit ansible config
 mkdir -p /etc/ansible/
 txt="[defaults]\nhost_key_checking=False\npipelining=True\nforks=100"
-echo -e $txt >> /etc/ansible/ansible.cfg
+echo -e $txt > /etc/ansible/ansible.cfg
 
 cd /home/ubuntu
 #Edit host file
@@ -21,8 +20,8 @@ ansible_private_ssh_key=/home/ubuntu/windows.pem
 ansible_user=ubuntu
 
 [all]
-$ip_master kubernetes_role="master"
-$ip_worker kubernetes_role="node"
+$(hostname) kubernetes_role="master"
+worker1 kubernetes_role="node"
 EOF
 
 #Edit key file
@@ -115,8 +114,8 @@ cat <<EOF > /home/ubuntu/playbook.yaml
     - geerlingguy.kubernetes
 EOF
 #Install ansible-role
-ansible-galaxy install geerlingguy.containerd
-ansible-galaxy install geerlingguy.kubernetes
+sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.containerd'
+sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.kubernetes'
 
 #Edit role file to use k8s with containerd
 line=("16" "25")
@@ -125,3 +124,14 @@ do
 sed -i "${n}s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/master-setup.yml
 done
 
+#change permission
+chown ubuntu:ubuntu /home/ubuntu/hosts
+chown ubuntu:ubuntu /home/ubuntu/playbook.yaml
+chown ubuntu:ubuntu /home/ubuntu/windows.pem
+##Run playbook
+sudo -H -u ubuntu bash -c 'ansible-playbook -i /home/ubuntu/hosts /home/ubuntu/playbook.yaml'
+
+#Copy config file 
+mkdir -p /home/ubuntu/.kube
+cp /etc/kubernetes/admin.config /home/ubuntu/.kube
+mv /home/ubuntu/.kube/admin.config  /home/ubuntu/.kube/config
