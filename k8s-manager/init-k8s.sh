@@ -20,7 +20,7 @@ ansible_ssh_private_key_file=/home/ubuntu/windows.pem
 ansible_user=ubuntu
 
 [all]
-$(hostname) kubernetes_role="master"
+$(hostname) kubernetes_role="control_plane"
 worker1 kubernetes_role="node"
 EOF
 
@@ -64,8 +64,7 @@ cat <<EOF > /home/ubuntu/playbook.yaml
   become: true
   become_method: sudo
   become_user: root
-  vars:
-    kubernetes_allow_pods_on_master: true
+
   pre_tasks:
     - name: Create containerd config file
       file:
@@ -111,32 +110,33 @@ cat <<EOF > /home/ubuntu/playbook.yaml
         cache_valid_time: 86400 #One day
   roles:
     - geerlingguy.containerd
-    - geerlingguy.kubernetes
+    - ansible-role-kubernetes
 EOF
 #Install ansible-role
 sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.containerd'
-sudo -H -u ubuntu bash -c 'ansible-galaxy install geerlingguy.kubernetes'
+cd /home/ubuntu/.ansible/roles/
+sudo -H -u ubuntu bash -c 'git clone https://github.com/geerlingguy/ansible-role-kubernetes.git'
 
-#Edit role file to use k8s with containerd
-##On master node file
-line=("16" "25")
-for n in "${line[@]}";
-do
-sed -i "${n}s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/master-setup.yml
-done
+# #Edit role file to use k8s with containerd
+# ##On master node file
+# line=("16" "25")
+# for n in "${line[@]}";
+# do
+# sed -i "${n}s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/master-setup.yml
+# done
 
-##On worker node file
-sed -i "s/shell/command/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
-sed -i "5s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
+# ##On worker node file
+# sed -i "s/shell/command/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
+# sed -i "5s/$/ --cri-socket \/run\/containerd\/containerd.sock/g" /home/ubuntu/.ansible/roles/geerlingguy.kubernetes/tasks/node-setup.yml
 
 #change permission
 chown ubuntu:ubuntu /home/ubuntu/hosts
 chown ubuntu:ubuntu /home/ubuntu/playbook.yaml
 chown ubuntu:ubuntu /home/ubuntu/windows.pem
-##Run playbook
+#Run playbook
 sudo -H -u ubuntu bash -c 'ansible-playbook -i /home/ubuntu/hosts /home/ubuntu/playbook.yaml'
 
-#Copy config file 
+# #Copy config file 
 mkdir -p /home/ubuntu/.kube
 cp /etc/kubernetes/admin.conf /home/ubuntu/.kube
 mv /home/ubuntu/.kube/admin.conf  /home/ubuntu/.kube/config
